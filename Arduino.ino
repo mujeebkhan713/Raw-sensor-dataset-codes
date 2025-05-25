@@ -66,5 +66,5 @@ void loop() {
     digitalWrite(RELAY_PIN, LOW); // Turn off relay
   }
 
-  delay(20000); // Wait for 15 seconds to meet ThingSpeak rate limit
+  delay(10000); // Wait for 10 seconds to meet ThingSpeak rate limit
 }
