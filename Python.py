@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import copy
 
+# Use Agg backend for non-interactive plotting
 matplotlib.use('Agg')
 
 # Load data
@@ -25,7 +26,7 @@ data = pd.read_csv('cleaned_data.csv')
 X = data[['smoke', 'temperature', 'humidity']]
 y = data['fire_label']  # Assuming 'fire_label' column exists with 0 for no fire and 1 for fire
 
-# Feature Selection Phase
+# --- Feature Selection Phase ---
 selector = SelectKBest(score_func=mutual_info_classif, k='all')  # you can set 'k=2' to select top 2 features
 selector.fit(X, y)
 selected_features = X.columns[selector.get_support()]
@@ -95,7 +96,7 @@ param_grids = {
         'max_features': ['log2'],
         'criterion': ['gini']
     },
-    'GaussianNB': {'var_smoothing': [1e-7]}
+    'GaussianNB': {'var_smoothing': [1e-7]}  # No hyperparameters to tune for GaussianNB
 }
 # Function to perform GridSearchCV on each classifier
 def optimize_model(model, param_grid, X_train, y_train):
@@ -311,8 +312,8 @@ def plot_model_performance(results, X_test, y_test, best_model_name):
         if y_pred_proba is not None:
             fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
             label = f'{name} (AUC = {result["roc_auc"]:.3f})'
-            if name == best_model_name:
-                label = f'Hybrid Dynamic Best Model (AUC = {result["roc_auc"]:.3f})'
+            if name == true_best_model_name:
+                label = f'{best_model_name} (AUC = {result["roc_auc"]:.3f})'
                 plt.plot(fpr, tpr, label=label, linewidth=3)  # Highlight the best model
             else:
                 plt.plot(fpr, tpr, label=label)
@@ -332,9 +333,10 @@ def plot_model_performance(results, X_test, y_test, best_model_name):
         plt.figure(figsize=(6, 5), dpi=1500)  # Smaller size with high resolution
         conf_matrix = confusion_matrix(y_test, y_pred)
         sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', cbar=False, annot_kws={"size": 14})
-        title = f' {name}'
-        if name == best_model_name:
-            title = f'Hybrid Dynamic Best Model'
+        if name == true_best_model_name:
+            title = f'{best_model_name}'
+        else:
+            title = f'{name}'
         plt.xlabel('Predicted', fontsize=12)
         plt.ylabel('Actual', fontsize=12)
         plt.title(title, fontsize=14)
@@ -350,8 +352,9 @@ def plot_precision_recall_curves(results, X_test, y_test, best_model_name):
             precision, recall, _ = precision_recall_curve(y_test, y_pred_proba)
             avg_precision = average_precision_score(y_test, y_pred_proba)
             label = f'{name} (AP = {avg_precision:.3f})'
-            if name == best_model_name:
-                label = f'Hybrid Dynamic Best Model (AP = {avg_precision:.3f})'
+            avg_precision = average_precision_score(y_test, y_pred_proba)
+            if name == true_best_model_name:
+                label = f'{best_model_name} (AP = {avg_precision:.3f})'
                 plt.plot(recall, precision, label=label, linewidth=3)
             else:
                 plt.plot(recall, precision, label=label)
@@ -388,9 +391,10 @@ def plot_pr_curve_10_percent_noise(models, perturbed_datasets, X_train, X_test, 
         precision, recall, _ = precision_recall_curve(y_test, y_pred_proba)
         avg_precision = average_precision_score(y_test, y_pred_proba)
 
-        if name == best_model_name:
-            plt.plot(recall, precision, label=f'Hybrid Dynamic Best Model (AP={avg_precision:.3f})',
-                     linewidth=3, linestyle='-')
+        if name == true_best_model_name:
+            label = f'{best_model_name} (AP = {avg_precision:.3f})'
+            plt.plot(recall, precision, label=label, linewidth=3)
+
         else:
             plt.plot(recall, precision, label=f'{name} (AP={avg_precision:.3f})', linewidth=1.5)
 
@@ -408,8 +412,9 @@ results = evaluate_models(X_train, X_val, X_holdout, y_train, y_val, y_holdout)
 scores = calculate_scores(results)
 
 # Select the best model initially
-best_model_name = max(scores, key=scores.get)
-best_model = results[best_model_name]['model']
+true_best_model_name = max(scores, key=scores.get)
+best_model = results[true_best_model_name]['model']
+best_model_name = "Hybrid Dynamic Best Model"
 print(f"Initial best model selected: {best_model_name}")
 #print(f"Initial best model selected: Hybrid Dynamic Best Model")
 
@@ -418,7 +423,7 @@ plot_learning_curve(best_model, X_train, y_train, best_model_name)
 
 # Plot learning curves for the best model
 plot_learning_curve_best_model(best_model, X_train, y_train, best_model_name)
-# Plot precision recall curve
+
 plot_precision_recall_curves(results, X_holdout, y_holdout, best_model_name)
 # Plot PR curve on 10% noise
 plot_pr_curve_10_percent_noise(models, perturbed_datasets, X_train, X_holdout, y_train, y_holdout, best_model_name)
@@ -477,7 +482,7 @@ name_mapping = {
     'GaussianNB': 'Gaussian NB'
 }
 # Update the name of the best model in the mapping dynamically
-name_mapping[best_model_name] = 'Hybrid Dynamic \n Best Model'
+name_mapping[true_best_model_name] = 'Hybrid Dynamic \n Best Model'
 
 # Plot metrics comparison as line chart
 metrics_df = pd.DataFrame(results).T[['accuracy', 'precision', 'recall', 'f1', 'roc_auc', 'mae', 'rmse']].reset_index().melt(id_vars='index')
@@ -500,10 +505,10 @@ plot_model_performance(results, X_holdout, y_holdout, best_model_name)
 
 # Function to fetch the latest sensor data from ThingSpeak
 def fetch_data():
-    api_key = 'J5TF4QOAPUQOV44R'  # Replace with your actual Read API Key for sensor data
-    sensor_channel_id = '2571096'  # Replace with your ThingSpeak Channel ID for sensor data
+    api_key = 'NXKNRY6ID9ZG4JQ6'  # Replace with your actual Read API Key for sensor data
+    sensor_channel_id = '2623324'  # Replace with your ThingSpeak Channel ID for sensor data
 
-    url = f'https://api.thingspeak.com/channels/2571096/feeds/last.json?api_key=J5TF4QOAPUQOV44R'
+    url = f'https://api.thingspeak.com/channels/2623324/feeds/last.json?api_key=NXKNRY6ID9ZG4JQ6'
 
     response = requests.get(url)
     data = response.json()
@@ -575,8 +580,9 @@ try:
 
                 results = evaluate_models(X_train, X_val, X_test, y_train, y_val, y_test)
                 scores = calculate_scores(results)
-                best_model_name = max(scores, key=scores.get)
-                best_model = results[best_model_name]['model']
+                true_best_model_name = max(scores, key=scores.get)
+                best_model = results[true_best_model_name]['model']
+                best_model_name = "Hybrid Dynamic Best Model"
                 print(f"Best model reselected: {best_model_name}")
 
                 retrain_duration = time.time() - retrain_start
